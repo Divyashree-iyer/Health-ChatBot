@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Chat Bot</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'chat/chat.css' %}">
+</head>
+
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Patient Information</h2>
+            <ul id="patient-info">
+                <p><strong>Name:</strong><br> {{ patient.first_name }} {{ patient.last_name }}</p>
+                <p><strong>Date of Birth:</strong><br> {{ patient.dob }}</p>
+                <p><strong>Phone:</strong><br> {{ patient.phone_number }}</p>
+                <p><strong>Email:</strong><br> {{ patient.email }}</p>
+                <p><strong>Medical Condition:</strong><br> {{ patient.medical_condition }}</p>
+                <p><strong>Medication Regimen:</strong><br> {{ patient.medication_regimen }}</p>
+                <p><strong>Last Appointment:</strong><br> {{ patient.last_appointment }}</p>
+                <p><strong>Next Appointment:</strong><br> {{ patient.next_appointment }}</p>
+                <p><strong>Doctor's Name:</strong><br> {{ patient.doctor_name }}</p>
+            </ul>
+            <h2>Appointment Requests</h2>
+            <p>{{ appointment_update }}</p>
+        </div>
+        <div class="chat-area">
+            <h2 align="center">Patient Chat Bot</h2>
+            <div class="chat-box" id="chat-box">
+                <div class="messages">
+                    {% for conversation in conversations %}
+                    <div class="message {% if conversation.is_bot %}message-bot{% else %}message-user{% endif %}">
+                        <div class="message-bubble">
+                            <span class="message-text">{{ conversation.message }}</span>
+                            <br>
+                            <small class="timestamp">{{ conversation.timestamp }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="input-area">
+                <form id="message-form" class="message-box" method="post">
+                    {% csrf_token %}
+                    <input id="message-input" type="text" name="message" placeholder="Type your message..." required>
+                    <button type="submit">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    function formatDjangoStyle(timestamp) {
+        const options = {
+            year: 'numeric',
+            month: 'short',  
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,  
+        };
+        
+        return new Date(timestamp).toLocaleString('en-US', options);
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        const messageBox = document.querySelector('.message-box');
+        const chatBox = document.querySelector('#chat-box .messages');
+
+        messageBox.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const inputField = messageBox.querySelector('input[name="message"]');
+            const userMessage = inputField.value;
+
+            // Display the user message
+            chatBox.innerHTML += `<div class='message message-user'><div class='message-bubble'><span class='message-text'>${userMessage}</span><small class="timestamp">${ formatDjangoStyle(new Date().toLocaleString()) }</small></div></div>`;
+            inputField.value = '';
+
+            // Show typing indicator
+            const typingIndicator = document.createElement('div');
+            typingIndicator.className = 'message message-bot';
+            typingIndicator.innerHTML = `<div class='message-bubble'><span class='text-light message-text'>Typing...</span></div>`;
+            chatBox.appendChild(typingIndicator);
+            chatBox.scrollTop = chatBox.scrollHeight; // Scroll to latest message
+
+            // Send the user message to the backend
+            fetch(messageBox.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}',
+                },
+                body: new URLSearchParams({ 'message': userMessage })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Remove typing indicator
+                chatBox.removeChild(typingIndicator);
+                // Display bot reply
+                chatBox.innerHTML += `<div class='message message-bot'><div class='message-bubble'><span class='message-text'>${data.bot_reply}</span>
+                <small class="timestamp">${ formatDjangoStyle(data.timestamp) }</small></div></div>`;
+                chatBox.scrollTop = chatBox.scrollHeight; // Scroll to latest message
+            });
+        });
+    });
+</script>
+</html>
